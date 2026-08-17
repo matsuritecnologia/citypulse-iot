@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>CityPulse IoT - Sismógrafo Urbano en Tiempo Real</title>
+  <title>Proyecto Tecnológico 1 Medios Colegio San Lucas - CityPulse IoT</title>
 
   <!-- MQTT Paho Client -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
@@ -11,8 +11,45 @@
 
   <style>
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; color: #f8fafc; text-align: center; margin: 0; padding: 20px; }
-    h1 { color: #38bdf8; margin-bottom: 5px; }
-    .subtitle { color: #94a3b8; font-size: 0.95em; margin-bottom: 25px; }
+    
+    /* --- Cabecera del Colegio y Proyecto --- */
+    .header-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .school-logo {
+      max-width: 120px;
+      height: auto;
+      border-radius: 8px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+      background-color: #ffffff;
+      padding: 5px;
+    }
+
+    .main-title { 
+      color: #38bdf8; 
+      font-size: 2.1em;
+      margin: 5px 0 0 0; 
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .project-subtitle { 
+      color: #f8fafc; 
+      font-size: 1.4em; 
+      margin: 5px 0;
+      font-weight: 600;
+    }
+    .tech-info { 
+      color: #94a3b8; 
+      font-size: 0.9em; 
+      margin-bottom: 20px; 
+    }
+
     .banner { padding: 15px; border-radius: 8px; font-size: 1.4em; font-weight: bold; margin-bottom: 25px; transition: background 0.3s; }
     .ok { background-color: #10b981; color: #fff; }
     .alerta { background-color: #ef4444; color: #fff; animation: blink 0.4s infinite alternate; }
@@ -27,8 +64,13 @@
 </head>
 <body>
 
-  <h1>CityPulse IoT ── Dashboard Urbano</h1>
-  <div class="subtitle">Conectado al Broker Público HiveMQ via WebSockets</div>
+  <!-- Cabecera con Logo y Título Institucional -->
+  <div class="header-container">
+    <img src="sanlucas.png" alt="Logo Colegio San Lucas" class="school-logo">
+    <h1 class="main-title">PROYECTO TECNOLÓGICO 1 MEDIOS COLEGIO SAN LUCAS</h1>
+    <div class="project-subtitle">CityPulse IoT ── Dashboard Urbano</div>
+    <div class="tech-info">Monitoreo Sismológico y Ambiental en Tiempo Real via WebSockets (HiveMQ)</div>
+  </div>
 
   <div id="statusBanner" class="banner ok">SISTEMA NORMAL - SIN ACTIVIDAD SÍSMICA</div>
 
@@ -47,21 +89,21 @@
     </div>
   </div>
 
-  <!-- Contenedor del Sismógrafo -->
+  <!-- Sismógrafo -->
   <div class="chart-container">
     <h3>Sismógrafo en Tiempo Real (Onda de Aceleración)</h3>
     <canvas id="seismographChart"></canvas>
   </div>
 
   <script>
-    // 1. Configuración de la Gráfica Chart.js
+    // Configuración de Chart.js
     const ctx = document.getElementById('seismographChart').getContext('2d');
-    const maxDataPoints = 30; // Número de puntos visibles en la pantalla
+    const maxDataPoints = 30;
 
     const seismographChart = new Chart(ctx, {
       type: 'line',
       data: {
-        labels: [], // Timestamps
+        labels: [],
         datasets: [{
           label: 'Aceleración (G)',
           data: [],
@@ -70,14 +112,14 @@
           borderWidth: 2,
           fill: true,
           tension: 0.3,
-          pointRadius: 0 // Línea continua sin puntos gigantes
+          pointRadius: 0
         }]
       },
       options: {
         responsive: true,
-        animation: false, // Desactivar animación pesada para actualización ultra rápida
+        animation: false,
         scales: {
-          x: { display: false }, // Ocultar eje X para efecto continuo
+          x: { display: false },
           y: { 
             min: 0, 
             max: 3, 
@@ -91,10 +133,10 @@
       }
     });
 
-    // 2. Configuración MQTT WebSockets
+    // Configuración MQTT
     const host = "broker.hivemq.com";
-    const port = 8884; // Puerto SSL para WebSockets en broker.hivemq.com
-    const topic = "citypulse_feria_2026/datos"; // Debe coincidir con el del Arduino
+    const port = 8884;
+    const topic = "citypulse_feria_2026/datos";
 
     const client = new Paho.MQTT.Client(host, port, "web_client_" + parseInt(Math.random() * 1000, 10));
 
@@ -102,28 +144,24 @@
       const data = JSON.parse(message.payloadString);
       const now = new Date().toLocaleTimeString();
 
-      // Actualizar valores numéricos
       document.getElementById('magVal').innerText = data.magnitud.toFixed(2) + " G";
       document.getElementById('tempVal').innerText = data.temp + " °C";
       document.getElementById('humVal').innerText = data.hum + " %";
 
-      // Actualizar Banner de Alerta
       const banner = document.getElementById('statusBanner');
       if (data.alerta) {
         banner.innerText = "🚨 ¡ALERTA SÍSMICA DETECTADA! 🚨";
         banner.className = "banner alerta";
-        seismographChart.data.datasets[0].borderColor = '#ef4444'; // Cambiar gráfica a rojo
+        seismographChart.data.datasets[0].borderColor = '#ef4444';
       } else {
         banner.innerText = "SISTEMA NORMAL - SIN ACTIVIDAD SÍSMICA";
         banner.className = "banner ok";
-        seismographChart.data.datasets[0].borderColor = '#38bdf8'; // Volver a azul
+        seismographChart.data.datasets[0].borderColor = '#38bdf8';
       }
 
-      // Agregar dato a la gráfica (Efecto Sismógrafo)
       seismographChart.data.labels.push(now);
       seismographChart.data.datasets[0].data.push(data.magnitud);
 
-      // Mantener solo los últimos N puntos
       if (seismographChart.data.labels.length > maxDataPoints) {
         seismographChart.data.labels.shift();
         seismographChart.data.datasets[0].data.shift();
@@ -135,7 +173,7 @@
     client.connect({
       useSSL: true,
       onSuccess: function () {
-        console.log("Conectado con éxito al broker público de HiveMQ");
+        console.log("Conectado con éxito al broker de HiveMQ");
         client.subscribe(topic);
       }
     });
