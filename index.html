@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <title>Proyecto Tecnológico 1 Medios Colegio San Lucas - CityPulse IoT</title>
 
-  <!-- Paho MQTT Client via CDN -->
+  <!-- Paho MQTT Client vía CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
-  <!-- Chart.js para el sismógrafo -->
+  <!-- Chart.js para el gráfico del sismógrafo -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
@@ -38,7 +38,7 @@
     <img src="sanlucas.png" alt="Logo Colegio San Lucas" class="school-logo">
     <h1 class="main-title">PROYECTO TECNOLÓGICO 1 MEDIOS COLEGIO SAN LUCAS</h1>
     <div class="project-subtitle">CityPulse IoT ── Estación Sísmica</div>
-    <div class="tech-info">Monitoreo Sismológico y Ambiental via Paho MQTT</div>
+    <div class="tech-info">Monitoreo Sismológico y Ambiental en Tiempo Real (Paho MQTT)</div>
   </div>
 
   <div id="statusBanner" class="banner ok">SISTEMA NORMAL - SIN ACTIVIDAD SÍSMICA</div>
@@ -58,14 +58,14 @@
     </div>
   </div>
 
-  <!-- Gráfica -->
+  <!-- Gráfica en tiempo real -->
   <div class="chart-container">
     <h3>Sismógrafo en Tiempo Real (Onda de Aceleración)</h3>
     <canvas id="seismographChart"></canvas>
   </div>
 
   <script>
-    // Configuración Gráfica Chart.js
+    // 1. Configuración de Gráfico Chart.js
     const ctx = document.getElementById('seismographChart').getContext('2d');
     const maxDataPoints = 30;
 
@@ -95,9 +95,9 @@
       }
     });
 
-    // Cliente Paho MQTT
+    // 2. Configuración y Cliente Paho MQTT
     const host = "broker.hivemq.com";
-    const port = 8884; // WebSocket SSL
+    const port = 8884; // Puerto WebSocket Seguro SSL
     const topic = "citypulse_feria_2026/datos";
     const clientId = "web_paho_" + Math.floor(Math.random() * 10000);
 
@@ -105,21 +105,22 @@
 
     client.onConnectionLost = function (responseObject) {
       if (responseObject.errorCode !== 0) {
-        console.log("Conexión perdida:", responseObject.errorMessage);
+        console.log("Conexión perdida con Paho MQTT:", responseObject.errorMessage);
       }
     };
 
     client.onMessageArrived = function (message) {
       try {
+        // Parsear el paquete JSON enviado por Arduino
         const data = JSON.parse(message.payloadString);
         const now = new Date().toLocaleTimeString();
 
-        // Actualizar datos en pantalla
+        // Actualizar Tarjetas de Información
         if (data.magnitud !== undefined) document.getElementById('magVal').innerText = parseFloat(data.magnitud).toFixed(2) + " G";
         if (data.temperatura !== undefined) document.getElementById('tempVal').innerText = parseFloat(data.temperatura).toFixed(1) + " °C";
         if (data.humedad !== undefined) document.getElementById('humVal').innerText = parseFloat(data.humedad).toFixed(1) + " %";
 
-        // Cambio de banner por alerta
+        // Cambio de banner por alerta sísmica
         const banner = document.getElementById('statusBanner');
         if (data.alerta === true || data.alerta === "true") {
           banner.innerText = "🚨 ¡ALERTA SÍSMICA DETECTADA! 🚨";
@@ -131,7 +132,7 @@
           seismographChart.data.datasets[0].borderColor = '#38bdf8';
         }
 
-        // Actualizar sismógrafo
+        // Agregar dato al gráfico sismográfico
         seismographChart.data.labels.push(now);
         seismographChart.data.datasets[0].data.push(data.magnitud);
 
@@ -146,15 +147,15 @@
       }
     };
 
-    // Conexión
+    // Conectar por WebSocket SSL
     client.connect({
       useSSL: true,
       onSuccess: function () {
-        console.log("Conectado con éxito a Paho MQTT");
+        console.log("¡Conectado exitosamente con Paho MQTT!");
         client.subscribe(topic);
       },
       onFailure: function (err) {
-        console.log("Error de conexión:", err);
+        console.log("Error de conexión Paho MQTT:", err);
       }
     });
   </script>
