@@ -3,75 +3,190 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitoreo San Lucas IoT</title>
+    <title>Monitoreo San Lucas IoT - Tiempo Real</title>
+    
     <!-- Librería Paho MQTT -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js" type="text/javascript"></script>
+    
+    <!-- Librería Chart.js para los gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #121212;
-            color: white;
+            color: #ffffff;
             text-align: center;
             padding: 20px;
+            margin: 0;
         }
-        .container {
+        h1 { margin-bottom: 5px; }
+        .subtitle { color: #aaaaaa; margin-top: 0; margin-bottom: 25px; }
+        
+        /* Contenedor de Tarjetas */
+        .cards-container {
             display: flex;
             justify-content: center;
             gap: 20px;
             flex-wrap: wrap;
-            margin-top: 20px;
+            margin-bottom: 25px;
         }
         .card {
             background-color: #1e1e1e;
-            border-radius: 10px;
-            padding: 20px;
-            width: 200px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            border-radius: 12px;
+            padding: 15px 25px;
+            min-width: 180px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            border: 1px solid #2a2a2a;
         }
-        .card h3 { color: #888; }
-        .value { font-size: 2.5em; font-weight: bold; margin: 10px 0; }
+        .card h3 { color: #888888; font-size: 0.9em; margin: 0 0 10px 0; text-transform: uppercase; }
+        .value { font-size: 2.2em; font-weight: bold; }
+        .unit { font-size: 0.8em; color: #888888; }
+
+        /* Banner de Alerta */
         #status-box {
-            margin-top: 30px;
-            padding: 15px;
-            border-radius: 5px;
+            margin: 0 auto 30px auto;
+            max-width: 800px;
+            padding: 12px;
+            border-radius: 8px;
             font-size: 1.2em;
             font-weight: bold;
             background-color: #2e7d32;
+            transition: background-color 0.3s ease;
         }
-        .alert { background-color: #c62828 !important; }
+        .alert { background-color: #c62828 !important; animation: blink 1s infinite; }
+
+        @keyframes blink {
+            50% { opacity: 0.7; }
+        }
+
+        /* Contenedor de Gráficos */
+        .charts-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .chart-box {
+            background-color: #1e1e1e;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            border: 1px solid #2a2a2a;
+        }
+        canvas { max-height: 250px; }
     </style>
 </head>
 <body>
 
-    <h1>Panel de Control San Lucas IoT</h1>
-    <p>Broker: <b>broker.emqx.io</b> | Estado Web: <span id="mqtt-status" style="color: yellow;">Conectando...</span></p>
+    <h1>Panel San Lucas IoT</h1>
+    <p class="subtitle">Broker: <b>broker.emqx.io</b> | Estado: <span id="mqtt-status" style="color: yellow;">Conectando...</span></p>
 
-    <div class="container">
+    <!-- Estado Sísmico -->
+    <div id="status-box">ESTADO: NORMAL</div>
+
+    <!-- Valores Numéricos -->
+    <div class="cards-container">
         <div class="card">
-            <h3>Magnitud</h3>
-            <div class="value" id="val-mag">0.00</div>
-            <span>G</span>
+            <h3>Aceleración</h3>
+            <div class="value" id="val-mag" style="color: #ff9800;">0.00</div>
+            <span class="unit">G</span>
         </div>
         <div class="card">
             <h3>Temperatura</h3>
-            <div class="value" id="val-temp">0</div>
-            <span>°C</span>
+            <div class="value" id="val-temp" style="color: #f44336;">0</div>
+            <span class="unit">°C</span>
         </div>
         <div class="card">
             <h3>Humedad</h3>
-            <div class="value" id="val-hum">0</div>
-            <span>%</span>
+            <div class="value" id="val-hum" style="color: #2196f3;">0</div>
+            <span class="unit">%</span>
         </div>
     </div>
 
-    <div id="status-box">ESTADO: NORMAL</div>
+    <!-- Gráficos en Tiempo Real -->
+    <div class="charts-container">
+        <div class="chart-box">
+            <canvas id="chartMagnitud"></canvas>
+        </div>
+        <div class="chart-box">
+            <canvas id="chartTempHum"></canvas>
+        </div>
+    </div>
 
     <script>
+        // Configuración MQTT
         const host = "broker.emqx.io";
         const port = 8084; // Puerto WebSocket seguro (WSS)
         const topic = "citypulse_feria_2026/datos";
-        const clientId = "WebClient_" + Math.random().toString(16).substr(2, 8);
+        const clientId = "WebClientGraph_" + Math.random().toString(16).substr(2, 8);
 
+        // Máximo de puntos a mostrar en el gráfico (últimas lecturas)
+        const maxDataPoints = 20;
+
+        // 1. Inicializar Gráfico de Aceleración / Magnitud
+        const ctxMag = document.getElementById('chartMagnitud').getContext('2d');
+        const chartMag = new Chart(ctxMag, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Aceleración (G)',
+                    borderColor: '#ff9800',
+                    backgroundColor: 'rgba(255, 152, 0, 0.2)',
+                    borderWidth: 2,
+                    data: [],
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: { ticks: { color: '#888' }, grid: { color: '#333' } },
+                    y: { ticks: { color: '#888' }, grid: { color: '#333' } }
+                },
+                plugins: { legend: { labels: { color: '#fff' } } }
+            }
+        });
+
+        // 2. Inicializar Gráfico de Temperatura y Humedad
+        const ctxTH = document.getElementById('chartTempHum').getContext('2d');
+        const chartTH = new Chart(ctxTH, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'Temperatura (°C)',
+                        borderColor: '#f44336',
+                        backgroundColor: 'rgba(244, 67, 54, 0.1)',
+                        borderWidth: 2,
+                        data: [],
+                        tension: 0.3
+                    },
+                    {
+                        label: 'Humedad (%)',
+                        borderColor: '#2196f3',
+                        backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                        borderWidth: 2,
+                        data: [],
+                        tension: 0.3
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: { ticks: { color: '#888' }, grid: { color: '#333' } },
+                    y: { ticks: { color: '#888' }, grid: { color: '#333' } }
+                },
+                plugins: { legend: { labels: { color: '#fff' } } }
+            }
+        });
+
+        // Conexión MQTT Client
         const client = new Paho.MQTT.Client(host, port, clientId);
 
         client.onConnectionLost = onConnectionLost;
@@ -103,11 +218,14 @@
         function onMessageArrived(message) {
             try {
                 const data = JSON.parse(message.payloadString);
-                
+                const timeLabel = new Date().toLocaleTimeString();
+
+                // Actualizar valores numéricos
                 document.getElementById("val-mag").innerText = data.magnitud;
                 document.getElementById("val-temp").innerText = data.temperatura;
                 document.getElementById("val-hum").innerText = data.humedad;
 
+                // Actualizar banner de alerta
                 const statusBox = document.getElementById("status-box");
                 if (data.alerta) {
                     statusBox.innerText = "¡ALERTA SÍSMICA DETECTADA!";
@@ -116,8 +234,31 @@
                     statusBox.innerText = "ESTADO: NORMAL";
                     statusBox.classList.remove("alert");
                 }
+
+                // --- ACTUALIZACIÓN DE GRÁFICOS ---
+
+                // 1. Gráfico Magnitud
+                chartMag.data.labels.push(timeLabel);
+                chartMag.data.datasets[0].data.push(data.magnitud);
+                if (chartMag.data.labels.length > maxDataPoints) {
+                    chartMag.data.labels.shift();
+                    chartMag.data.datasets[0].data.shift();
+                }
+                chartMag.update();
+
+                // 2. Gráfico Temperatura y Humedad
+                chartTH.data.labels.push(timeLabel);
+                chartTH.data.datasets[0].data.push(data.temperatura);
+                chartTH.data.datasets[1].data.push(data.humedad);
+                if (chartTH.data.labels.length > maxDataPoints) {
+                    chartTH.data.labels.shift();
+                    chartTH.data.datasets[0].data.shift();
+                    chartTH.data.datasets[1].data.shift();
+                }
+                chartTH.update();
+
             } catch (e) {
-                console.error("Error al procesar JSON:", e);
+                console.error("Error al procesar el mensaje JSON:", e);
             }
         }
     </script>
